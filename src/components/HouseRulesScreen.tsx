@@ -20,16 +20,20 @@ interface HouseRulesScreenProps {
 interface HouseRules {
   id: string;
   house_id: string;
-  content: string;
+  title: string;
+  description: string;
   created_by: string;
   created_at: string;
-  updated_at: string;
 }
 
 function HouseRulesContent({ houseId, houseName, houseCreatorId }: HouseRulesScreenProps) {
   const { user } = useAuth();
-  const [rules, setRules] = useState<HouseRules | null>(null);
-  const [content, setContent] = useState('');
+  const [rules, setRules] = useState<HouseRules[]>([]);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [editingRule, setEditingRule] = useState<HouseRules | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,12 +54,11 @@ function HouseRulesContent({ houseId, houseName, houseCreatorId }: HouseRulesScr
         .from('house_rules')
         .select('*')
         .eq('house_id', houseId)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
       if (fetchError) throw fetchError;
 
-      setRules(data);
-      setContent(data?.content || '');
+      setRules(data || []);
     } catch (err) {
       console.error('Error loading rules:', err);
       setError('Erro ao carregar as regras da casa.');
@@ -64,9 +67,14 @@ function HouseRulesContent({ houseId, houseName, houseCreatorId }: HouseRulesScr
     }
   };
 
-  const handleSave = async () => {
+  const handleCreateRule = async () => {
     if (!isCreator) {
-      alert('Apenas o criador da casa pode editar as regras.');
+      alert('Apenas o criador da casa pode criar regras.');
+      return;
+    }
+
+    if (!newTitle.trim()) {
+      alert('Por favor, insira um título para a regra.');
       return;
     }
 
@@ -74,29 +82,19 @@ function HouseRulesContent({ houseId, houseName, houseCreatorId }: HouseRulesScr
     setError(null);
 
     try {
-      if (rules) {
-        const { error: updateError } = await supabase
-          .from('house_rules')
-          .update({ content: content.trim() })
-          .eq('id', rules.id);
+      const { error: insertError } = await supabase
+        .from('house_rules')
+        .insert({
+          house_id: houseId,
+          title: newTitle.trim(),
+          description: newDescription.trim() || '',
+          created_by: user!.id,
+        });
 
-        if (updateError) throw updateError;
-      } else {
-        const { data: newRules, error: insertError } = await supabase
-          .from('house_rules')
-          .insert({
-            house_id: houseId,
-            content: content.trim(),
-            created_by: user!.id,
-          })
-          .select()
-          .single();
+      if (insertError) throw insertError;
 
-        if (insertError) throw insertError;
-        setRules(newRules);
-      }
-
-      setIsEditing(false);
+      setNewTitle('');
+      setNewDescription('');
       await loadRules();
     } catch (err) {
       console.error('Error saving rules:', err);
@@ -106,10 +104,65 @@ function HouseRulesContent({ houseId, houseName, houseCreatorId }: HouseRulesScr
     }
   };
 
-  const handleCancel = () => {
-    setContent(rules?.content || '');
-    setIsEditing(false);
+  const handleEditRule = async () => {
+    if (!isCreator || !editingRule) {
+      return;
+    }
+
+    if (!editTitle.trim()) {
+      alert('Por favor, insira um título para a regra.');
+      return;
+    }
+
+    setSaving(true);
     setError(null);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('house_rules')
+        .update({
+          title: editTitle.trim(),
+          description: editDescription.trim() || '',
+        })
+        .eq('id', editingRule.id);
+
+      if (updateError) throw updateError;
+
+      setEditingRule(null);
+      setEditTitle('');
+      setEditDescription('');
+      await loadRules();
+    } catch (err) {
+      console.error('Error updating rule:', err);
+      setError('Erro ao atualizar a regra. Por favor, tente novamente.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    if (!isCreator) {
+      alert('Apenas o criador da casa pode eliminar regras.');
+      return;
+    }
+
+    if (!confirm('Tem certeza que deseja eliminar esta regra?')) {
+      return;
+    }
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('house_rules')
+        .delete()
+        .eq('id', ruleId);
+
+      if (deleteError) throw deleteError;
+
+      await loadRules();
+    } catch (err) {
+      console.error('Error deleting rule:', err);
+      alert('Erro ao eliminar a regra.');
+    }
   };
 
   if (loading) {
@@ -138,15 +191,6 @@ function HouseRulesContent({ houseId, houseName, houseCreatorId }: HouseRulesScr
                   <p className="text-blue-100 text-sm mt-1">{houseName}</p>
                 </div>
               </div>
-              {isCreator && !isEditing && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white font-semibold rounded-lg transition-all duration-200 backdrop-blur-sm"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  Editar
-                </button>
-              )}
             </div>
           </div>
 
@@ -158,102 +202,152 @@ function HouseRulesContent({ houseId, houseName, houseCreatorId }: HouseRulesScr
               </div>
             )}
 
-            {isCreator && isEditing ? (
-              <div className="space-y-4">
+            {isCreator && (
+              <div className="mb-6 bg-slate-900/30 rounded-xl p-6 border border-slate-700 space-y-4">
+                <h3 className="text-lg font-semibold text-slate-200 mb-4">Adicionar Nova Regra</h3>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Defina as regras da casa
+                    Título *
                   </label>
-                  <textarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Escreva aqui as regras da casa... &#10;&#10;Exemplo:&#10;1. Manter a casa limpa e organizada&#10;2. Respeitar os horários de silêncio (22h-8h)&#10;3. Avisar com antecedência quando convidar visitas&#10;4. Dividir igualmente as tarefas domésticas&#10;5. Comunicar qualquer problema ou conflito de forma respeitosa"
-                    className="w-full h-96 px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono text-sm leading-relaxed"
+                  <input
+                    type="text"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="Ex: Horário de silêncio"
+                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled={saving}
                   />
-                  <p className="mt-2 text-xs text-slate-500">
-                    {content.length} caracteres
-                  </p>
                 </div>
-
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={handleCancel}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Ex: Manter silêncio entre 22h e 8h"
+                    className="w-full h-24 px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                     disabled={saving}
-                    className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        A guardar...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Guardar Regras
-                      </>
-                    )}
-                  </button>
+                  />
                 </div>
-              </div>
-            ) : (
-              <div>
-                {content && content.trim() !== '' ? (
-                  <div className="bg-slate-900/30 rounded-xl p-6 border border-slate-700">
-                    <pre className="whitespace-pre-wrap text-slate-200 font-sans text-base leading-relaxed">
-                      {content}
-                    </pre>
-                  </div>
-                ) : (
-                  <div className="text-center py-16">
-                    <div className="bg-slate-700/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <ScrollText className="w-8 h-8 text-slate-500" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-slate-400 mb-2">
-                      Nenhuma regra definida
-                    </h3>
-                    <p className="text-slate-500 text-sm mb-4">
-                      {isCreator
-                        ? 'Clique em "Editar" para adicionar as regras da casa.'
-                        : 'O criador da casa ainda não definiu as regras.'}
-                    </p>
-                  </div>
-                )}
-
-                {!isCreator && content && content.trim() !== '' && (
-                  <div className="mt-6 bg-blue-900/20 border border-blue-600/30 rounded-xl p-4">
-                    <p className="text-blue-300 text-sm flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <span>
-                        Estas regras foram definidas pelo criador da casa. Todos os membros devem
-                        respeitá-las para uma convivência harmoniosa.
-                      </span>
-                    </p>
-                  </div>
-                )}
+                <button
+                  onClick={handleCreateRule}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      A criar...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Adicionar Regra
+                    </>
+                  )}
+                </button>
               </div>
             )}
+
+            <div className="space-y-4">
+              {rules.length > 0 ? (
+                rules.map((rule) => (
+                  <div key={rule.id} className="bg-slate-900/30 rounded-xl p-6 border border-slate-700">
+                    {editingRule?.id === rule.id ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Título</label>
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            disabled={saving}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Descrição</label>
+                          <textarea
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            className="w-full h-24 px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                            disabled={saving}
+                          />
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                          <button
+                            onClick={() => {
+                              setEditingRule(null);
+                              setEditTitle('');
+                              setEditDescription('');
+                            }}
+                            disabled={saving}
+                            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleEditRule}
+                            disabled={saving}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                          >
+                            Guardar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-slate-200 mb-2">{rule.title}</h3>
+                            {rule.description && (
+                              <p className="text-slate-400 text-sm whitespace-pre-wrap">{rule.description}</p>
+                            )}
+                          </div>
+                          {isCreator && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingRule(rule);
+                                  setEditTitle(rule.title);
+                                  setEditDescription(rule.description || '');
+                                }}
+                                className="p-2 text-blue-400 hover:text-blue-300 hover:bg-slate-700 rounded-lg transition-colors"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRule(rule.id)}
+                                className="p-2 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors"
+                              >
+                                <AlertCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-16">
+                  <div className="bg-slate-700/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <ScrollText className="w-8 h-8 text-slate-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-400 mb-2">
+                    Nenhuma regra definida
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    {isCreator
+                      ? 'Adicione as regras da casa acima.'
+                      : 'O criador da casa ainda não definiu as regras.'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
-        {isCreator && !isEditing && (
-          <div className="mt-6 bg-slate-800/30 border border-slate-700 rounded-xl p-4">
-            <p className="text-slate-400 text-sm flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>
-                <strong className="text-slate-300">Nota:</strong> Como criador da casa, apenas você
-                pode editar estas regras. Todos os membros podem visualizá-las.
-              </span>
-            </p>
-          </div>
-        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-50">
