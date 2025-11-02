@@ -314,7 +314,7 @@ export function SharedExpensesScreen() {
         const updatePromises = payments.map(async (payment) => {
           const { data: updatedPayment, error: paymentUpdateError } = await supabase
             .from('shared_expense_payments')
-            .update({ amount: amountPerPerson })
+            .update({ amount_owed: amountPerPerson })
             .eq('id', payment.id)
             .select();
 
