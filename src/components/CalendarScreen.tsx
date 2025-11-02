@@ -16,12 +16,9 @@ interface CalendarEvent {
   house_id: string;
   created_by: string;
   title: string;
-  description: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  event_type: 'single' | 'recurring';
-  event_date: string | null;
+  description: string | null;
+  event_date: string;
+  event_time: string | null;
   created_at: string;
   creator?: {
     username: string;
@@ -45,11 +42,8 @@ export default function CalendarScreen() {
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
-    day_of_week: 0,
-    start_time: '09:00',
-    end_time: '10:00',
-    event_type: 'single' as 'single' | 'recurring',
     event_date: '',
+    event_time: '09:00',
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -119,7 +113,8 @@ export default function CalendarScreen() {
           )
         `)
         .eq('house_id', houseId)
-        .or(`event_type.eq.recurring,and(event_type.eq.single,event_date.gte.${weekStart},event_date.lte.${weekEnd})`);
+        .gte('event_date', weekStart)
+        .lte('event_date', weekEnd);
 
       if (error) throw error;
 
@@ -136,40 +131,6 @@ export default function CalendarScreen() {
     }
   };
 
-  const checkConflict = (
-    dayOfWeek: number,
-    startTime: string,
-    endTime: string,
-    eventDate: string | null,
-    excludeEventId?: string
-  ): boolean => {
-    const newStart = timeToMinutes(startTime);
-    const newEnd = timeToMinutes(endTime);
-
-    return events.some(event => {
-      if (excludeEventId && event.id === excludeEventId) return false;
-
-      if (event.event_type === 'recurring') {
-        if (event.day_of_week !== dayOfWeek) return false;
-      } else {
-        if (event.event_date !== eventDate) return false;
-      }
-
-      const existingStart = timeToMinutes(event.start_time);
-      const existingEnd = timeToMinutes(event.end_time);
-
-      return (
-        (newStart >= existingStart && newStart < existingEnd) ||
-        (newEnd > existingStart && newEnd <= existingEnd) ||
-        (newStart <= existingStart && newEnd >= existingEnd)
-      );
-    });
-  };
-
-  const timeToMinutes = (time: string): number => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
 
   const handleCreateEvent = async () => {
     if (!newEvent.title.trim()) {
@@ -177,20 +138,8 @@ export default function CalendarScreen() {
       return;
     }
 
-    if (newEvent.start_time >= newEvent.end_time) {
-      setError('A hora de fim deve ser posterior à hora de início.');
-      return;
-    }
-
-    const eventDate = newEvent.event_type === 'single' ? newEvent.event_date : null;
-
-    if (newEvent.event_type === 'single' && !eventDate) {
-      setError('Por favor, selecione uma data para a atividade única.');
-      return;
-    }
-
-    if (checkConflict(newEvent.day_of_week, newEvent.start_time, newEvent.end_time, eventDate)) {
-      setError('Já existe uma atividade agendada neste horário. Por favor, escolha outro horário.');
+    if (!newEvent.event_date) {
+      setError('Por favor, selecione uma data para o evento.');
       return;
     }
 
@@ -204,12 +153,9 @@ export default function CalendarScreen() {
           house_id: houseId,
           created_by: user!.id,
           title: newEvent.title.trim(),
-          description: newEvent.description.trim(),
-          day_of_week: newEvent.day_of_week,
-          start_time: newEvent.start_time,
-          end_time: newEvent.end_time,
-          event_type: newEvent.event_type,
-          event_date: eventDate,
+          description: newEvent.description.trim() || null,
+          event_date: newEvent.event_date,
+          event_time: newEvent.event_time || null,
         });
 
       if (insertError) throw insertError;
@@ -218,11 +164,8 @@ export default function CalendarScreen() {
       setNewEvent({
         title: '',
         description: '',
-        day_of_week: 0,
-        start_time: '09:00',
-        end_time: '10:00',
-        event_type: 'single',
         event_date: '',
+        event_time: '09:00',
       });
       await loadEvents();
     } catch (error) {
@@ -254,13 +197,7 @@ export default function CalendarScreen() {
 
   const getEventsForDay = (dayOfWeek: number, date: Date): CalendarEvent[] => {
     const dateStr = formatDate(date);
-    return events.filter(event => {
-      if (event.event_type === 'recurring') {
-        return event.day_of_week === dayOfWeek;
-      } else {
-        return event.event_date === dateStr;
-      }
-    });
+    return events.filter(event => event.event_date === dateStr);
   };
 
   const navigateWeek = (direction: 'prev' | 'next') => {
@@ -377,14 +314,13 @@ export default function CalendarScreen() {
                                 <p className="text-white font-semibold text-sm line-clamp-2">
                                   {event.title}
                                 </p>
-                                {event.event_type === 'recurring' && (
-                                  <Repeat className="w-3 h-3 text-white/70 flex-shrink-0" />
-                                )}
                               </div>
-                              <div className="flex items-center gap-1 text-blue-100 text-xs mb-1">
-                                <Clock className="w-3 h-3" />
-                                <span>{event.start_time.slice(0, 5)} - {event.end_time.slice(0, 5)}</span>
-                              </div>
+                              {event.event_time && (
+                                <div className="flex items-center gap-1 text-blue-100 text-xs mb-1">
+                                  <Clock className="w-3 h-3" />
+                                  <span>{event.event_time.slice(0, 5)}</span>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1 text-blue-200 text-xs">
                                 <User className="w-3 h-3" />
                                 <span>{event.creator?.username}#{event.creator?.tag}</span>
@@ -441,115 +377,28 @@ export default function CalendarScreen() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Tipo de Atividade *
+                  Data *
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setNewEvent({ ...newEvent, event_type: 'single' })}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      newEvent.event_type === 'single'
-                        ? 'border-green-500 bg-green-900/20'
-                        : 'border-slate-600 bg-slate-900/30 hover:bg-slate-900/50'
-                    }`}
-                    disabled={submitting}
-                  >
-                    <CalendarDays className={`w-6 h-6 mx-auto mb-2 ${
-                      newEvent.event_type === 'single' ? 'text-green-400' : 'text-slate-400'
-                    }`} />
-                    <p className={`text-sm font-medium ${
-                      newEvent.event_type === 'single' ? 'text-green-300' : 'text-slate-300'
-                    }`}>
-                      Única
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">Ocorre apenas uma vez</p>
-                  </button>
-                  <button
-                    onClick={() => setNewEvent({ ...newEvent, event_type: 'recurring' })}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      newEvent.event_type === 'recurring'
-                        ? 'border-green-500 bg-green-900/20'
-                        : 'border-slate-600 bg-slate-900/30 hover:bg-slate-900/50'
-                    }`}
-                    disabled={submitting}
-                  >
-                    <Repeat className={`w-6 h-6 mx-auto mb-2 ${
-                      newEvent.event_type === 'recurring' ? 'text-green-400' : 'text-slate-400'
-                    }`} />
-                    <p className={`text-sm font-medium ${
-                      newEvent.event_type === 'recurring' ? 'text-green-300' : 'text-slate-300'
-                    }`}>
-                      Semanal
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">Repete toda semana</p>
-                  </button>
-                </div>
+                <input
+                  type="date"
+                  value={newEvent.event_date}
+                  onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  disabled={submitting}
+                />
               </div>
 
-              {newEvent.event_type === 'single' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Data *
-                  </label>
-                  <input
-                    type="date"
-                    value={newEvent.event_date}
-                    onChange={(e) => {
-                      const date = new Date(e.target.value + 'T00:00:00');
-                      setNewEvent({
-                        ...newEvent,
-                        event_date: e.target.value,
-                        day_of_week: date.getDay()
-                      });
-                    }}
-                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    disabled={submitting}
-                  />
-                </div>
-              )}
-
-              {newEvent.event_type === 'recurring' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Dia da Semana *
-                  </label>
-                  <select
-                    value={newEvent.day_of_week}
-                    onChange={(e) => setNewEvent({ ...newEvent, day_of_week: parseInt(e.target.value) })}
-                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    disabled={submitting}
-                  >
-                    {DAYS_OF_WEEK.map((day, index) => (
-                      <option key={index} value={index}>{day}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Hora de Início *
-                  </label>
-                  <input
-                    type="time"
-                    value={newEvent.start_time}
-                    onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    disabled={submitting}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Hora de Fim *
-                  </label>
-                  <input
-                    type="time"
-                    value={newEvent.end_time}
-                    onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    disabled={submitting}
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Hora (Opcional)
+                </label>
+                <input
+                  type="time"
+                  value={newEvent.event_time}
+                  onChange={(e) => setNewEvent({ ...newEvent, event_time: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  disabled={submitting}
+                />
               </div>
 
               <div>
@@ -616,52 +465,33 @@ export default function CalendarScreen() {
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3 text-slate-300">
                 <div className="bg-slate-700 p-2 rounded-lg">
-                  {selectedEvent.event_type === 'recurring' ? (
-                    <Repeat className="w-5 h-5 text-blue-400" />
-                  ) : (
-                    <CalendarDays className="w-5 h-5 text-blue-400" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-400">Tipo</p>
-                  <p className="text-slate-200">
-                    {selectedEvent.event_type === 'recurring' ? 'Atividade Semanal' : 'Atividade Única'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 text-slate-300">
-                <div className="bg-slate-700 p-2 rounded-lg">
                   <CalendarIcon className="w-5 h-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-400">
-                    {selectedEvent.event_type === 'recurring' ? 'Dia da Semana' : 'Data'}
-                  </p>
+                  <p className="text-sm font-medium text-slate-400">Data</p>
                   <p className="text-slate-200">
-                    {selectedEvent.event_type === 'recurring'
-                      ? DAYS_OF_WEEK[selectedEvent.day_of_week]
-                      : new Date(selectedEvent.event_date + 'T00:00:00').toLocaleDateString('pt-PT', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric'
-                        })
-                    }
+                    {new Date(selectedEvent.event_date + 'T00:00:00').toLocaleDateString('pt-PT', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 text-slate-300">
-                <div className="bg-slate-700 p-2 rounded-lg">
-                  <Clock className="w-5 h-5 text-purple-400" />
+              {selectedEvent.event_time && (
+                <div className="flex items-center gap-3 text-slate-300">
+                  <div className="bg-slate-700 p-2 rounded-lg">
+                    <Clock className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-400">Horário</p>
+                    <p className="text-slate-200">
+                      {selectedEvent.event_time.slice(0, 5)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-400">Horário</p>
-                  <p className="text-slate-200">
-                    {selectedEvent.start_time.slice(0, 5)} - {selectedEvent.end_time.slice(0, 5)}
-                  </p>
-                </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-3 text-slate-300">
                 <div className="bg-slate-700 p-2 rounded-lg">
