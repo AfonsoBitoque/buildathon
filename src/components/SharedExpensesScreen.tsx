@@ -290,7 +290,7 @@ export function SharedExpensesScreen() {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('shared_expense_payments')
         .select('*')
-        .eq('shared_expense_id', editingExpense.id);
+        .eq('expense_id', editingExpense.id);
 
       if (paymentsError) throw paymentsError;
 
