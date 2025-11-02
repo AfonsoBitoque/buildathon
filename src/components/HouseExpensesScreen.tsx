@@ -293,7 +293,7 @@ export function HouseExpensesScreen() {
         const updatePromises = payments.map(async (payment) => {
           const { data: updatedPayment, error: paymentUpdateError } = await supabase
             .from('house_expense_payments')
-            .update({ amount: amountPerPerson })
+            .update({ amount_owed: amountPerPerson })
             .eq('id', payment.id)
             .select();
 
@@ -314,7 +314,7 @@ export function HouseExpensesScreen() {
         const updatePromises = payments.map(async (payment) => {
           const { data: updatedPayment, error: paymentUpdateError } = await supabase
             .from('house_expense_payments')
-            .update({ amount: amount })
+            .update({ amount_owed: amount })
             .eq('id', payment.id)
             .select();
 
