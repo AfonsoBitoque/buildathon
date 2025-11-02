@@ -23,6 +23,10 @@ interface HouseMember {
 interface MemberPoints {
   user_id: string;
   points: number;
+  fixed_expense_points: number;
+  variable_expense_points: number;
+  shared_debt_points: number;
+  task_points: number;
   users: {
     username: string;
     tag: string;
@@ -119,7 +123,7 @@ export default function ProfileScreen() {
     // Get points for members
     const { data: pointsData, error: pointsError } = await supabase
       .from('member_points')
-      .select('user_id, points')
+      .select('user_id, points, fixed_expense_points, variable_expense_points, shared_debt_points, task_points')
       .eq('house_id', houseId);
 
     if (pointsError) throw pointsError;
@@ -129,6 +133,10 @@ export default function ProfileScreen() {
     const mergedData = (membersData || []).map(member => ({
       user_id: member.user_id,
       points: pointsMap.get(member.user_id)?.points || 0,
+      fixed_expense_points: pointsMap.get(member.user_id)?.fixed_expense_points || 0,
+      variable_expense_points: pointsMap.get(member.user_id)?.variable_expense_points || 0,
+      shared_debt_points: pointsMap.get(member.user_id)?.shared_debt_points || 0,
+      task_points: pointsMap.get(member.user_id)?.task_points || 0,
       users: member.users
     }));
 
@@ -280,7 +288,8 @@ export default function ProfileScreen() {
                           <th className="text-left py-3 px-4 text-slate-400 font-semibold text-sm">Membro</th>
                           <th className="text-center py-3 px-4 text-slate-400 font-semibold text-sm">Tarefas</th>
                           <th className="text-center py-3 px-4 text-slate-400 font-semibold text-sm">Fixas</th>
-                          <th className="text-center py-3 px-4 text-slate-400 font-semibold text-sm">Dívidas</th>
+                          <th className="text-center py-3 px-4 text-slate-400 font-semibold text-sm">Flutuantes</th>
+                          <th className="text-center py-3 px-4 text-slate-400 font-semibold text-sm">Partilhadas</th>
                           <th className="text-right py-3 px-4 text-slate-400 font-semibold text-sm">Total</th>
                         </tr>
                       </thead>
@@ -336,6 +345,12 @@ export default function ProfileScreen() {
                                 <div className="flex flex-col items-center">
                                   <span className="text-green-400 font-semibold">{member.fixed_expense_points}</span>
                                   <span className="text-slate-500 text-xs">{member.fixed_expense_points} pagos</span>
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-center">
+                                <div className="flex flex-col items-center">
+                                  <span className="text-yellow-400 font-semibold">{member.variable_expense_points}</span>
+                                  <span className="text-slate-500 text-xs">{member.variable_expense_points / 2} pagos</span>
                                 </div>
                               </td>
                               <td className="py-4 px-4 text-center">
