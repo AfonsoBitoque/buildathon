@@ -17,9 +17,9 @@ interface HouseExpense {
 
 interface ExpensePayment {
   id: string;
-  house_expense_id: string;
-  member_id: string;
-  amount: number;
+  expense_id: string;
+  user_id: string;
+  amount_owed: number;
   is_paid: boolean;
   paid_at: string | null;
   created_at: string;
@@ -86,10 +86,10 @@ export function HouseExpensesScreen() {
           const { data: paymentsData } = await supabase
             .from('house_expense_payments')
             .select('*')
-            .eq('house_expense_id', expense.id);
+            .eq('expense_id', expense.id);
 
           const payments = paymentsData || [];
-          const myPayment = payments.find((p: ExpensePayment) => p.member_id === user.id);
+          const myPayment = payments.find((p: ExpensePayment) => p.user_id === user.id);
           const allPaid = payments.length > 0 && payments.every((p: ExpensePayment) => p.is_paid);
 
           if (allPaid) {
@@ -215,9 +215,9 @@ export function HouseExpensesScreen() {
         const amountPerPerson = amount / totalMembers;
 
         const paymentsToCreate = members.map((member) => ({
-          house_expense_id: expenseData.id,
-          member_id: member.user_id,
-          amount: amountPerPerson,
+          expense_id: expenseData.id,
+          user_id: member.user_id,
+          amount_owed: amountPerPerson,
         }));
 
         const { error: paymentsError } = await supabase
@@ -229,9 +229,9 @@ export function HouseExpensesScreen() {
         const { error: paymentsError } = await supabase
           .from('house_expense_payments')
           .insert({
-            house_expense_id: expenseData.id,
-            member_id: user.id,
-            amount: amount,
+            expense_id: expenseData.id,
+            user_id: user.id,
+            amount_owed: amount,
           });
 
         if (paymentsError) throw paymentsError;
@@ -277,7 +277,7 @@ export function HouseExpensesScreen() {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('house_expense_payments')
         .select('*')
-        .eq('house_expense_id', editingExpense.id);
+        .eq('expense_id', editingExpense.id);
 
       if (paymentsError) throw paymentsError;
 
@@ -420,7 +420,7 @@ export function HouseExpensesScreen() {
                 {myPayment && (
                   <div className="flex items-center gap-2 text-blue-400 font-semibold">
                     <DollarSign className="w-4 h-4" />
-                    <span>Sua parte: {myPayment.amount.toFixed(2)} €</span>
+                    <span>Sua parte: {myPayment.amount_owed.toFixed(2)} €</span>
                   </div>
                 )}
 
@@ -480,7 +480,7 @@ export function HouseExpensesScreen() {
         {confirmingPayment === myPayment?.id && (
           <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-xl p-4 animate-in slide-in-from-top duration-200">
             <p className="text-yellow-400 font-semibold mb-3">
-              ⚠️ Tem a certeza que pagou {myPayment.amount.toFixed(2)} € desta despesa?
+              ⚠️ Tem a certeza que pagou {myPayment.amount_owed.toFixed(2)} € desta despesa?
             </p>
             <div className="flex gap-2">
               <button

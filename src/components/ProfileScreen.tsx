@@ -111,10 +111,6 @@ export default function ProfileScreen() {
       .select(`
         user_id,
         points,
-        fixed_expense_points,
-        variable_expense_points,
-        shared_debt_points,
-        task_points,
         users (
           username,
           tag
