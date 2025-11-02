@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, User, Lock, Hash, Shuffle, Loader2, CheckCircle2, XCircle, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Mail, User, Lock, Hash, Shuffle, Loader2, CheckCircle2, XCircle, Eye, EyeOff, RefreshCw, Home } from 'lucide-react';
 import { registerUser, generateRandomTag, checkTagAvailability } from '../lib/auth';
 
 export function SignUpScreen() {
@@ -130,8 +130,8 @@ export function SignUpScreen() {
       return false;
     }
 
-    if (tagStatus === 'unavailable') {
-      setError('Tag não está disponível. Por favor, escolha outra.');
+    if (tagStatus !== 'available') {
+      setError('Tag não disponível ou não verificada');
       return false;
     }
 
@@ -149,9 +149,7 @@ export function SignUpScreen() {
     try {
       await registerUser(email, username, tag, password);
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+      setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar conta');
     } finally {
@@ -160,256 +158,270 @@ export function SignUpScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-6"
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-8 group"
         >
-          <ArrowLeft className="w-5 h-5" />
-          Voltar
+          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="font-medium">Voltar</span>
         </button>
 
-        <div className="bg-slate-800 rounded-2xl shadow-2xl p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold text-white">Criar Conta</h2>
-            <p className="text-slate-400">Preencha os dados para se registar</p>
+        <div className="bg-white rounded-3xl shadow-colivin-lg p-8 space-y-6 border border-gray-100">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-colivin rounded-2xl mb-2">
+              <Home className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-colivin bg-clip-text text-transparent">
+              Co-Livin
+            </h1>
+            <h2 className="text-2xl font-bold text-gray-900">Criar Conta</h2>
+            <p className="text-gray-600">Junte-se à comunidade</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-colivin-cobalt-500 focus:bg-white transition-all"
                   placeholder="seu@email.com"
                   disabled={loading || success}
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Username
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                  className="w-full pl-12 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="usuario_exemplo"
-                  disabled={loading || success}
-                />
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Username
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.replace(/[^A-Za-z0-9]/g, ''))}
+                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-colivin-cobalt-500 focus:bg-white transition-all"
+                    placeholder="username"
+                    disabled={loading || success}
+                    maxLength={20}
+                  />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Tag Única (4 caracteres)
-              </label>
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input
-                      type="text"
-                      value={tag}
-                      onChange={(e) => setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))}
-                      className="w-full pl-12 pr-12 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="XXXX"
-                      maxLength={4}
-                      disabled={loading || success}
-                    />
-                    {checkingTag && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-400 animate-spin" />
-                    )}
-                    {!checkingTag && tagStatus === 'available' && tag.length === 4 && (
-                      <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-400" />
-                    )}
-                    {!checkingTag && tagStatus === 'unavailable' && tag.length === 4 && (
-                      <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-400" />
-                    )}
-                  </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Tag
+                </label>
+                <div className="relative">
+                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={tag}
+                    onChange={(e) => setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))}
+                    className={`w-full pl-12 pr-12 py-3.5 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
+                      tagStatus === 'available' ? 'border-colivin-mint-500' :
+                      tagStatus === 'unavailable' ? 'border-red-500' :
+                      'border-gray-200 focus:border-colivin-cobalt-500'
+                    }`}
+                    placeholder="A1B2"
+                    disabled={loading || success}
+                    maxLength={4}
+                  />
                   <button
                     type="button"
                     onClick={handleGenerateTag}
-                    className="px-4 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-white transition-colors flex items-center gap-2"
                     disabled={loading || success}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-colivin-cobalt-600 hover:text-colivin-cobalt-700 disabled:opacity-50"
                   >
                     <Shuffle className="w-5 h-5" />
                   </button>
                 </div>
-                {username && tag.length === 4 && (
-                  <div className="text-sm text-slate-400 flex items-center gap-2">
-                    Formato final: <span className="text-white font-mono">{username}#{tag}</span>
-                  </div>
-                )}
-                {tagStatus === 'unavailable' && (
-                  <p className="text-sm text-red-400">Tag não disponível. Escolha outra.</p>
+                {checkingTag && (
+                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    A verificar...
+                  </p>
                 )}
                 {tagStatus === 'available' && (
-                  <p className="text-sm text-green-400">Tag disponível!</p>
+                  <p className="text-xs text-colivin-mint-600 font-medium mt-1 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    {username}#{tag} disponível
+                  </p>
+                )}
+                {tagStatus === 'unavailable' && (
+                  <p className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
+                    <XCircle className="w-3 h-3" />
+                    {username}#{tag} já existe
+                  </p>
                 )}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Palavra-passe
               </label>
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-12 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="••••••••"
-                      disabled={loading || success}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                      disabled={loading || success}
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-12 pr-20 py-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-colivin-cobalt-500 focus:bg-white transition-all"
+                  placeholder="Palavra-passe segura"
+                  disabled={loading || success}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
                   <button
                     type="button"
                     onClick={handleGeneratePassword}
-                    className="px-4 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-white transition-colors flex items-center gap-2"
                     disabled={loading || success}
-                    title="Gerar palavra-passe segura"
+                    className="text-colivin-cobalt-600 hover:text-colivin-cobalt-700 disabled:opacity-50"
+                    title="Gerar palavra-passe"
                   >
                     <RefreshCw className="w-5 h-5" />
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading || success}
+                    className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
-                <div className="bg-slate-700/50 rounded-lg p-3 space-y-1.5">
-                  <p className="text-xs font-semibold text-slate-300 mb-1.5">Requisitos da palavra-passe:</p>
+              </div>
+              {password && (
+                <div className="mt-2 space-y-1">
                   <div className="flex items-center gap-2 text-xs">
                     {passwordReqs.length ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                      <CheckCircle2 className="w-3 h-3 text-colivin-mint-600" />
                     ) : (
-                      <XCircle className="w-3.5 h-3.5 text-slate-500" />
+                      <XCircle className="w-3 h-3 text-gray-400" />
                     )}
-                    <span className={passwordReqs.length ? 'text-green-400' : 'text-slate-400'}>
-                      Mínimo de 8 caracteres
+                    <span className={passwordReqs.length ? 'text-colivin-mint-600 font-medium' : 'text-gray-500'}>
+                      Mínimo 8 caracteres
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     {passwordReqs.uppercase ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                      <CheckCircle2 className="w-3 h-3 text-colivin-mint-600" />
                     ) : (
-                      <XCircle className="w-3.5 h-3.5 text-slate-500" />
+                      <XCircle className="w-3 h-3 text-gray-400" />
                     )}
-                    <span className={passwordReqs.uppercase ? 'text-green-400' : 'text-slate-400'}>
-                      Pelo menos 1 letra maiúscula
+                    <span className={passwordReqs.uppercase ? 'text-colivin-mint-600 font-medium' : 'text-gray-500'}>
+                      1 letra maiúscula
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     {passwordReqs.number ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                      <CheckCircle2 className="w-3 h-3 text-colivin-mint-600" />
                     ) : (
-                      <XCircle className="w-3.5 h-3.5 text-slate-500" />
+                      <XCircle className="w-3 h-3 text-gray-400" />
                     )}
-                    <span className={passwordReqs.number ? 'text-green-400' : 'text-slate-400'}>
-                      Pelo menos 1 número
+                    <span className={passwordReqs.number ? 'text-colivin-mint-600 font-medium' : 'text-gray-500'}>
+                      1 número
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     {passwordReqs.special ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                      <CheckCircle2 className="w-3 h-3 text-colivin-mint-600" />
                     ) : (
-                      <XCircle className="w-3.5 h-3.5 text-slate-500" />
+                      <XCircle className="w-3 h-3 text-gray-400" />
                     )}
-                    <span className={passwordReqs.special ? 'text-green-400' : 'text-slate-400'}>
-                      Pelo menos 1 caractere especial (!@#$%^&*)
+                    <span className={passwordReqs.special ? 'text-colivin-mint-600 font-medium' : 'text-gray-500'}>
+                      1 caractere especial (!@#$%^&*)
                     </span>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Confirmar Palavra-passe
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-12 pr-12 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="••••••••"
+                  className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-colivin-cobalt-500 focus:bg-white transition-all"
+                  placeholder="Repita a palavra-passe"
                   disabled={loading || success}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
                   disabled={loading || success}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 >
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
               {confirmPassword && password !== confirmPassword && (
-                <p className="text-sm text-red-400 mt-1.5 flex items-center gap-1.5">
-                  <XCircle className="w-3.5 h-3.5" />
+                <p className="text-xs text-red-600 font-medium mt-1">
                   As palavras-passe não coincidem
-                </p>
-              )}
-              {confirmPassword && password === confirmPassword && allRequirementsMet && (
-                <p className="text-sm text-green-400 mt-1.5 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  As palavras-passe coincidem
                 </p>
               )}
             </div>
 
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                {error}
+              <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                <p className="text-sm text-red-700 font-medium">{error}</p>
               </div>
             )}
 
             {success && (
-              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                Conta criada com sucesso! Redirecionando...
+              <div className="bg-colivin-mint-50 border-2 border-colivin-mint-200 rounded-xl p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-colivin-mint-600" />
+                <p className="text-sm text-colivin-mint-700 font-medium">
+                  Conta criada! A redirecionar para login...
+                </p>
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading || success || checkingTag || !allRequirementsMet || password !== confirmPassword}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-lg transition-colors flex items-center justify-center gap-2"
+              disabled={loading || success || !allRequirementsMet || tagStatus !== 'available'}
+              className="w-full py-4 bg-gradient-colivin hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-xl transition-all duration-200 shadow-lg hover:shadow-colivin disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading && <Loader2 className="w-5 h-5 animate-spin" />}
-              {success ? 'Conta Criada!' : 'Criar Conta'}
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  A criar conta...
+                </>
+              ) : success ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  Conta criada!
+                </>
+              ) : (
+                'Criar Conta'
+              )}
             </button>
           </form>
 
-          <div className="text-center">
-            <button
-              onClick={() => navigate('/login')}
-              className="text-slate-400 hover:text-white text-sm transition-colors"
-              disabled={loading || success}
-            >
-              Já tem conta? <span className="text-blue-400 font-semibold">Entrar</span>
-            </button>
+          <div className="text-center pt-4 border-t border-gray-100">
+            <p className="text-gray-600">
+              Já tem conta?{' '}
+              <button
+                onClick={() => navigate('/login')}
+                className="text-colivin-cobalt-600 hover:text-colivin-cobalt-700 font-semibold transition-colors"
+              >
+                Entrar
+              </button>
+            </p>
           </div>
         </div>
       </div>
