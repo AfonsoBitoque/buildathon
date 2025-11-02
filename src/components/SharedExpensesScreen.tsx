@@ -19,9 +19,9 @@ interface SharedExpense {
 
 interface ExpensePayment {
   id: string;
-  shared_expense_id: string;
-  debtor_id: string;
-  amount: number;
+  expense_id: string;
+  user_id: string;
+  amount_owed: number;
   is_paid: boolean;
   paid_at: string | null;
   created_at: string;
@@ -61,9 +61,9 @@ export function SharedExpensesScreen() {
 
     try {
       const { data: debtsData, error: debtsError } = await supabase
-        .from('expense_payments')
+        .from('shared_expense_payments')
         .select('*, shared_expenses!inner(*)')
-        .eq('debtor_id', user.id)
+        .eq('user_id', user.id)
         .eq('is_paid', false);
 
       if (debtsError) throw debtsError;
@@ -99,9 +99,9 @@ export function SharedExpensesScreen() {
       const creditsData = await Promise.all(
         (myExpenses || []).map(async (expense: any) => {
           const { data: payments } = await supabase
-            .from('expense_payments')
+            .from('shared_expense_payments')
             .select('*')
-            .eq('shared_expense_id', expense.id)
+            .eq('expense_id', expense.id)
             .eq('is_paid', false);
 
           const paymentsWithDebtors = await Promise.all(
@@ -109,7 +109,7 @@ export function SharedExpensesScreen() {
               const { data: debtorData } = await supabase
                 .from('users')
                 .select('username, tag')
-                .eq('id', payment.debtor_id)
+                .eq('id', payment.user_id)
                 .single();
 
               return {
@@ -138,14 +138,14 @@ export function SharedExpensesScreen() {
     if (!houseId) return;
 
     const paymentsChannel = supabase
-      .channel(`expense_payments:${user?.id}`)
+      .channel(`shared_expense_payments:${user?.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'expense_payments',
-          filter: `debtor_id=eq.${user?.id}`,
+          table: 'shared_expense_payments',
+          filter: `user_id=eq.${user?.id}`,
         },
         () => {
           loadExpenses();
@@ -223,13 +223,13 @@ export function SharedExpensesScreen() {
       const paymentsToCreate = members
         .filter((member) => member.user_id !== user.id)
         .map((member) => ({
-          shared_expense_id: expenseData.id,
-          debtor_id: member.user_id,
-          amount: amountPerPerson,
+          expense_id: expenseData.id,
+          user_id: member.user_id,
+          amount_owed: amountPerPerson,
         }));
 
       const { error: paymentsError } = await supabase
-        .from('expense_payments')
+        .from('shared_expense_payments')
         .insert(paymentsToCreate);
 
       if (paymentsError) throw paymentsError;
@@ -288,7 +288,7 @@ export function SharedExpensesScreen() {
       console.log('Total house members (N):', totalHouseMembers);
 
       const { data: paymentsData, error: paymentsError } = await supabase
-        .from('expense_payments')
+        .from('shared_expense_payments')
         .select('*')
         .eq('shared_expense_id', editingExpense.id);
 
@@ -313,7 +313,7 @@ export function SharedExpensesScreen() {
 
         const updatePromises = payments.map(async (payment) => {
           const { data: updatedPayment, error: paymentUpdateError } = await supabase
-            .from('expense_payments')
+            .from('shared_expense_payments')
             .update({ amount: amountPerPerson })
             .eq('id', payment.id)
             .select();
@@ -371,7 +371,7 @@ export function SharedExpensesScreen() {
 
     try {
       const { error } = await supabase
-        .from('expense_payments')
+        .from('shared_expense_payments')
         .update({
           is_paid: true,
           paid_at: new Date().toISOString(),
@@ -562,7 +562,7 @@ export function SharedExpensesScreen() {
                         <div className="flex flex-wrap gap-4 text-sm">
                           <div className="flex items-center gap-2 text-green-400 font-semibold">
                             <DollarSign className="w-4 h-4" />
-                            <span>{debt.amount.toFixed(2)} €</span>
+                            <span>{debt.amount_owed.toFixed(2)} €</span>
                           </div>
                           {debt.shared_expense?.creator && (
                             <div className="flex items-center gap-2 text-slate-400">
@@ -589,7 +589,7 @@ export function SharedExpensesScreen() {
                   {confirmingPayment === debt.id && (
                     <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-xl p-4 animate-in slide-in-from-top duration-200">
                       <p className="text-yellow-400 font-semibold mb-3">
-                        ⚠️ Tem a certeza que pagou {debt.amount.toFixed(2)} € a {debt.shared_expense?.creator?.username}?
+                        ⚠️ Tem a certeza que pagou {debt.amount_owed.toFixed(2)} € a {debt.shared_expense?.creator?.username}?
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -670,7 +670,7 @@ export function SharedExpensesScreen() {
                           </span>
                         </div>
                         <span className="text-green-400 font-semibold">
-                          {payment.amount.toFixed(2)} €
+                          {payment.amount_owed.toFixed(2)} €
                         </span>
                       </div>
                     ))}
