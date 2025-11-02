@@ -23,10 +23,6 @@ interface HouseMember {
 interface MemberPoints {
   user_id: string;
   points: number;
-  fixed_expense_points: number;
-  variable_expense_points: number;
-  shared_debt_points: number;
-  task_points: number;
   users: {
     username: string;
     tag: string;
@@ -123,7 +119,7 @@ export default function ProfileScreen() {
     // Get points for members
     const { data: pointsData, error: pointsError } = await supabase
       .from('member_points')
-      .select('user_id, points, fixed_expense_points, variable_expense_points, shared_debt_points, task_points')
+      .select('user_id, points')
       .eq('house_id', houseId);
 
     if (pointsError) throw pointsError;
@@ -133,10 +129,6 @@ export default function ProfileScreen() {
     const mergedData = (membersData || []).map(member => ({
       user_id: member.user_id,
       points: pointsMap.get(member.user_id)?.points || 0,
-      fixed_expense_points: pointsMap.get(member.user_id)?.fixed_expense_points || 0,
-      variable_expense_points: pointsMap.get(member.user_id)?.variable_expense_points || 0,
-      shared_debt_points: pointsMap.get(member.user_id)?.shared_debt_points || 0,
-      task_points: pointsMap.get(member.user_id)?.task_points || 0,
       users: member.users
     }));
 
