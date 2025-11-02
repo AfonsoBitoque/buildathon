@@ -1,5 +1,5 @@
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { MessageCircle, CheckSquare, DollarSign, ScrollText, Calendar } from 'lucide-react';
+import { MessageCircle, CheckSquare, DollarSign, ScrollText, Calendar, Home } from 'lucide-react';
 
 export function HouseFooter() {
   const navigate = useNavigate();
@@ -11,6 +11,11 @@ export function HouseFooter() {
   };
 
   const navItems = [
+    {
+      path: '',
+      icon: Home,
+      label: 'Home',
+    },
     {
       path: '/home',
       icon: MessageCircle,
@@ -39,8 +44,8 @@ export function HouseFooter() {
   ];
 
   return (
-    <div className="bg-slate-800 border-t border-slate-700">
-      <div className="flex items-center justify-around px-4 py-3">
+    <div className="bg-white border-t-2 border-gray-200 shadow-lg">
+      <div className="flex items-center justify-around px-2 py-2 max-w-7xl mx-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
@@ -48,14 +53,14 @@ export function HouseFooter() {
             <button
               key={item.path}
               onClick={() => navigate(`/casa/${houseId}${item.path}`)}
-              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
+              className={`flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl transition-all min-w-[60px] ${
                 active
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                  ? 'bg-gradient-colivin text-white shadow-colivin'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
-              <Icon className="w-6 h-6" />
-              <span className="text-xs font-medium">{item.label}</span>
+              <Icon className="w-5 h-5" strokeWidth={active ? 2.5 : 2} />
+              <span className="text-xs font-semibold">{item.label}</span>
             </button>
           );
         })}
