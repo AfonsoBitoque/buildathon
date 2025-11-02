@@ -106,21 +106,44 @@ export default function ProfileScreen() {
   const loadPoints = async () => {
     if (!houseId) return;
 
-    const { data, error } = await supabase
-      .from('member_points')
+    // Get all house members
+    const { data: membersData, error: membersError } = await supabase
+      .from('house_members')
       .select(`
         user_id,
-        points,
         users (
           username,
           tag
         )
       `)
-      .eq('house_id', houseId)
-      .order('points', { ascending: false });
+      .eq('house_id', houseId);
 
-    if (error) throw error;
-    setMemberPoints(data || []);
+    if (membersError) throw membersError;
+
+    // Get points for members
+    const { data: pointsData, error: pointsError } = await supabase
+      .from('member_points')
+      .select('user_id, points, fixed_expense_points, variable_expense_points, shared_debt_points, task_points')
+      .eq('house_id', houseId);
+
+    if (pointsError) throw pointsError;
+
+    // Merge data: all members with their points (or 0 if no points)
+    const pointsMap = new Map(pointsData?.map(p => [p.user_id, p]) || []);
+    const mergedData = (membersData || []).map(member => ({
+      user_id: member.user_id,
+      points: pointsMap.get(member.user_id)?.points || 0,
+      fixed_expense_points: pointsMap.get(member.user_id)?.fixed_expense_points || 0,
+      variable_expense_points: pointsMap.get(member.user_id)?.variable_expense_points || 0,
+      shared_debt_points: pointsMap.get(member.user_id)?.shared_debt_points || 0,
+      task_points: pointsMap.get(member.user_id)?.task_points || 0,
+      users: member.users
+    }));
+
+    // Sort by points descending
+    mergedData.sort((a, b) => b.points - a.points);
+
+    setMemberPoints(mergedData);
   };
 
   const handleRemoveMember = async (memberId: string, memberUserId: string) => {
