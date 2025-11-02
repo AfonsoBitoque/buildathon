@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Send, Loader2, MessageCircle } from 'lucide-react';
+import { Send, LogOut, Loader2, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { HouseFooter } from './HouseFooter';
@@ -28,7 +28,7 @@ interface House {
 }
 
 export function HouseChatScreen() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { id: houseId } = useParams<{ id: string }>();
   const [house, setHouse] = useState<House | null>(null);
@@ -121,23 +121,88 @@ export function HouseChatScreen() {
   };
 
   const subscribeToMessages = () => {
+    if (!houseId) return;
+
+    console.log('Setting up real-time subscription for house:', houseId);
+
     const channel = supabase
       .channel(`chat:${houseId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'chat_messages',
           filter: `house_id=eq.${houseId}`,
         },
-        (payload) => {
-          loadMessages();
+        async (payload) => {
+          console.log('Received real-time event:', payload.eventType);
+
+          if (payload.eventType === 'INSERT') {
+            const { data } = await supabase
+              .from('chat_messages')
+              .select(`
+                id,
+                house_id,
+                user_id,
+                content,
+                created_at,
+                updated_at,
+                is_edited,
+                users (
+                  username,
+                  tag
+                )
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (data) {
+              console.log('Adding new message to chat:', data);
+              setMessages((prev) => {
+                const exists = prev.some(msg => msg.id === data.id);
+                if (exists) {
+                  console.log('Message already exists, skipping');
+                  return prev;
+                }
+                return [...prev, data as ChatMessage];
+              });
+            }
+          } else if (payload.eventType === 'DELETE') {
+            setMessages((prev) => prev.filter((msg) => msg.id !== payload.old.id));
+          } else if (payload.eventType === 'UPDATE') {
+            const { data } = await supabase
+              .from('chat_messages')
+              .select(`
+                id,
+                house_id,
+                user_id,
+                content,
+                created_at,
+                updated_at,
+                is_edited,
+                users (
+                  username,
+                  tag
+                )
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (data) {
+              setMessages((prev) =>
+                prev.map((msg) => (msg.id === data.id ? (data as ChatMessage) : msg))
+              );
+            }
+          }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up subscription');
       supabase.removeChannel(channel);
     };
   };
@@ -145,7 +210,7 @@ export function HouseChatScreen() {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!newMessage.trim() || !user || !houseId) return;
+    if (!newMessage.trim() || !houseId || !user) return;
 
     setSending(true);
 
@@ -167,12 +232,24 @@ export function HouseChatScreen() {
     }
   };
 
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 text-colivin-cobalt-500 animate-spin mx-auto" />
-          <p className="text-gray-600 font-medium">A carregar chat...</p>
+          <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto" />
+          <p className="text-slate-300">A carregar...</p>
         </div>
       </div>
     );
@@ -183,103 +260,102 @@ export function HouseChatScreen() {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
-      <div className="bg-white border-b-2 border-gray-200 shadow-sm px-6 py-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-colivin rounded-xl">
-              <MessageCircle className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{house.name}</h1>
-              <p className="text-sm text-gray-600 font-medium">Chat Geral</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
+      <div className="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-white">{house.name}</h1>
+          <p className="text-sm text-slate-400">Chat Geral</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate(`/casa/${houseId}/perfil`)}
+            className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+          >
+            <User className="w-4 h-4" />
+            <span className="text-sm">Perfil</span>
+          </button>
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm">Sair</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 pb-20 space-y-4">
+        {messages.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-slate-400 text-lg">
+              Nenhuma mensagem ainda. Seja o primeiro a enviar!
+            </p>
           </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto space-y-4">
-          {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-2xl mb-4">
-                <MessageCircle className="w-8 h-8 text-gray-400" />
-              </div>
-              <p className="text-gray-600 font-medium">Ainda não há mensagens</p>
-              <p className="text-sm text-gray-500 mt-1">Seja o primeiro a enviar uma mensagem!</p>
-            </div>
-          ) : (
-            messages.map((message) => {
-              const isOwnMessage = message.user_id === user?.id;
-              return (
+        ) : (
+          messages.map((message) => {
+            const isOwnMessage = message.user_id === user?.id;
+            return (
+              <div
+                key={message.id}
+                className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+              >
                 <div
-                  key={message.id}
-                  className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                  className={`max-w-md px-4 py-2 rounded-lg ${
+                    isOwnMessage
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-100'
+                  }`}
                 >
-                  <div
-                    className={`max-w-[70%] ${
-                      isOwnMessage
-                        ? 'bg-gradient-colivin text-white'
-                        : 'bg-white text-gray-900 border-2 border-gray-200'
-                    } rounded-2xl px-4 py-3 shadow-md`}
+                  {!isOwnMessage && (
+                    <p className="text-xs font-semibold mb-1 opacity-90">
+                      {message.users.username}#{message.users.tag}
+                    </p>
+                  )}
+                  <p className="text-sm break-words">{message.content}</p>
+                  <p
+                    className={`text-xs mt-1 ${
+                      isOwnMessage ? 'text-blue-200' : 'text-slate-400'
+                    }`}
                   >
-                    {!isOwnMessage && (
-                      <p className="text-xs font-semibold text-colivin-cobalt-600 mb-1">
-                        {message.users.username}#{message.users.tag}
-                      </p>
-                    )}
-                    <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-                      {message.content}
-                    </p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        isOwnMessage ? 'text-white/70' : 'text-gray-500'
-                      }`}
-                    >
-                      {new Date(message.created_at).toLocaleTimeString('pt-PT', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                      {message.is_edited && ' (editado)'}
-                    </p>
-                  </div>
+                    {formatTime(message.created_at)}
+                    {message.is_edited && ' (editado)'}
+                  </p>
                 </div>
-              );
-            })
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
-      <div className="bg-white border-t-2 border-gray-200 px-4 py-4">
-        <div className="max-w-4xl mx-auto">
-          <form onSubmit={handleSendMessage} className="flex gap-3">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Escreva uma mensagem..."
-              className="flex-1 px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-colivin-cobalt-500 focus:bg-white transition-all"
-              disabled={sending}
-            />
-            <button
-              type="submit"
-              disabled={!newMessage.trim() || sending}
-              className="px-6 py-3 bg-gradient-colivin hover:opacity-90 disabled:opacity-50 text-white font-semibold rounded-xl transition-all shadow-lg disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {sending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
+      <div className="fixed bottom-16 left-0 right-0 bg-slate-800 border-t border-slate-700 p-4">
+        <form onSubmit={handleSendMessage} className="flex gap-2 max-w-7xl mx-auto">
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Escreva uma mensagem..."
+            className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            disabled={sending}
+          />
+          <button
+            type="submit"
+            disabled={!newMessage.trim() || sending}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center gap-2"
+          >
+            {sending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
                 <Send className="w-5 h-5" />
-              )}
-            </button>
-          </form>
-        </div>
+                Enviar
+              </>
+            )}
+          </button>
+        </form>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-50">
-        <HouseFooter />
-      </div>
+      <HouseFooter />
     </div>
   );
 }
