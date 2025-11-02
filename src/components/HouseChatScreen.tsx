@@ -42,7 +42,8 @@ export function HouseChatScreen() {
     if (user && houseId) {
       loadHouseData();
       loadMessages();
-      subscribeToMessages();
+      const unsubscribe = subscribeToMessages();
+      return unsubscribe;
     }
   }, [user, houseId]);
 
@@ -122,6 +123,8 @@ export function HouseChatScreen() {
   const subscribeToMessages = () => {
     if (!houseId) return;
 
+    console.log('Setting up real-time subscription for house:', houseId);
+
     const channel = supabase
       .channel(`chat:${houseId}`)
       .on(
@@ -133,6 +136,8 @@ export function HouseChatScreen() {
           filter: `house_id=eq.${houseId}`,
         },
         async (payload) => {
+          console.log('Received real-time event:', payload.eventType);
+
           if (payload.eventType === 'INSERT') {
             const { data } = await supabase
               .from('chat_messages')
@@ -153,7 +158,15 @@ export function HouseChatScreen() {
               .single();
 
             if (data) {
-              setMessages((prev) => [...prev, data as ChatMessage]);
+              console.log('Adding new message to chat:', data);
+              setMessages((prev) => {
+                const exists = prev.some(msg => msg.id === data.id);
+                if (exists) {
+                  console.log('Message already exists, skipping');
+                  return prev;
+                }
+                return [...prev, data as ChatMessage];
+              });
             }
           } else if (payload.eventType === 'DELETE') {
             setMessages((prev) => prev.filter((msg) => msg.id !== payload.old.id));
@@ -184,9 +197,12 @@ export function HouseChatScreen() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up subscription');
       supabase.removeChannel(channel);
     };
   };
